@@ -40,8 +40,8 @@ Game jars and libraries come from Mojang and don't belong in this repo.
 
 ## Status
 
-Works: `--smoke`. The JVM starts from Rust, the loader finds the test mod, its mixin patches `LocalPlayer`
-and the chat message reaches Rust.
+Works in the real game: the JVM starts from Rust, the loader finds the test mod, its mixin patches `LocalPlayer`
+and its message shows up in the game's chat. Tested on Windows with Nightly 2026-11-05 (66f3981).
 
 Problems:
 
