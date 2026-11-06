@@ -1,0 +1,12 @@
+[package]
+name = "horizon-fabric-host"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "Runs Fabric Loader and Fabric mods in a JVM embedded in Horizon"
+
+# Both are in Horizon's Cargo.lock, which is what a native mod's crate may use. jni's `invocation`
+# feature would need java-locator, which is not, so jvm.dll is loaded by hand.
+[dependencies]
+jni = "0.21"
+libloading = "0.8"

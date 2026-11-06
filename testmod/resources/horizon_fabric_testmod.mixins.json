@@ -1,0 +1,7 @@
+{
+  "required": true,
+  "package": "dev.horizonlab.fabric.testmod.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": ["LocalPlayerMixin"],
+  "injectors": { "defaultRequire": 1 }
+}

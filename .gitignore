@@ -1,0 +1,7 @@
+/.local/
+target/
+Cargo.lock
+__pycache__/
+# Downloaded libraries, Minecraft's files and mods: never in this repository.
+*.jar
+*.class

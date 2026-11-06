@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "horizon_fabric_testmod",
+  "version": "1.2.3",
+  "name": "Horizon Fabric test mod",
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "client": ["dev.horizonlab.fabric.testmod.HelloMod"]
+  },
+  "mixins": ["horizon_fabric_testmod.mixins.json"],
+  "depends": {
+    "minecraft": "26.3.x",
+    "fabricloader": ">=0.20.0"
+  }
+}
