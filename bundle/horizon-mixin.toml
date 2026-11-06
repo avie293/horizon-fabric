@@ -1,0 +1,17 @@
+[mod]
+id = "horizon_fabric"
+version = "0.1.0"
+
+# Every frame, title screen included. The host turns that into 20 ticks a second. The client tick
+# hook would fit better, but it isn't in the Nightly yet.
+[[injection]]
+id = "frame"
+hook = "frame"
+hook_version = 1
+kind = "HEAD"
+helper = "frame.rs"
+bindings = [{ name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" }]
+
+[[crate]]
+id = "host"
+path = "host"

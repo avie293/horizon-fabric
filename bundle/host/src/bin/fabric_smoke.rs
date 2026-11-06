@@ -3,17 +3,8 @@
 //! fabric_smoke <java home> <dist folder> <game dir> [expected message]
 
 use horizon_fabric_host::{Config, FabricHost, Outgoing};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::ExitCode;
-
-fn jars(folder: &Path) -> Vec<PathBuf> {
-    let mut jars: Vec<PathBuf> = std::fs::read_dir(folder)
-        .map(|entries| entries.flatten().map(|e| e.path()).collect())
-        .unwrap_or_default();
-    jars.retain(|p| p.extension().is_some_and(|e| e == "jar"));
-    jars.sort();
-    jars
-}
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -21,16 +12,7 @@ fn main() -> ExitCode {
         eprintln!("usage: fabric_smoke <java home> <dist folder> <game dir> [expected message]");
         return ExitCode::from(2);
     };
-    let dist = Path::new(dist);
-    let mut classpath = jars(&dist.join("libs"));
-    classpath.push(dist.join("horizon-fabric-provider.jar"));
-    let config = Config {
-        java_home: java_home.into(),
-        classpath,
-        game_jar: dist.join("horizon-fabric-game.jar"),
-        game_libraries: jars(&dist.join("game-libs")),
-        game_dir: game_dir.into(),
-    };
+    let config = Config::from_dist(java_home.into(), Path::new(dist), game_dir.into());
 
     let host = match FabricHost::start(&config) {
         Ok(host) => host,

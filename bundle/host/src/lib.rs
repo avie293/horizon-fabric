@@ -9,8 +9,10 @@ use std::ffi::{CString, c_void};
 use std::fmt;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 const BOOTSTRAP: &str = "dev/horizonlab/fabric/loader/Bootstrap";
+const TICK: Duration = Duration::from_millis(50);
 
 /// What the host needs to start. Everything is a path on the player's machine.
 #[derive(Clone, Debug)]
@@ -25,6 +27,30 @@ pub struct Config {
     pub game_libraries: Vec<PathBuf>,
     /// Holds `mods/` and `config/`.
     pub game_dir: PathBuf,
+}
+
+impl Config {
+    /// The layout `build.py` writes: `libs/`, `game-libs/` and the two jars of ours in `dist`.
+    pub fn from_dist(java_home: PathBuf, dist: &Path, game_dir: PathBuf) -> Config {
+        let mut classpath = jars(&dist.join("libs"));
+        classpath.push(dist.join("horizon-fabric-provider.jar"));
+        Config {
+            java_home,
+            classpath,
+            game_jar: dist.join("horizon-fabric-game.jar"),
+            game_libraries: jars(&dist.join("game-libs")),
+            game_dir,
+        }
+    }
+}
+
+fn jars(folder: &Path) -> Vec<PathBuf> {
+    let mut jars: Vec<PathBuf> = std::fs::read_dir(folder)
+        .map(|entries| entries.flatten().map(|e| e.path()).collect())
+        .unwrap_or_default();
+    jars.retain(|p| p.extension().is_some_and(|e| e == "jar"));
+    jars.sort();
+    jars
 }
 
 /// Why the host couldn't do something. A Java exception comes with its stack trace.
@@ -119,6 +145,76 @@ impl FabricHost {
         )
         .map_err(|e| java_error(&mut env, e))?;
         Ok(take_outgoing())
+    }
+}
+
+/// What `on_frame` keeps between frames.
+enum Runtime {
+    NotStarted,
+    Running {
+        host: FabricHost,
+        last_tick: Instant,
+    },
+    /// Not installed, or it failed. `report` is shown once a world is open, so the player sees it.
+    Off {
+        report: Option<String>,
+    },
+}
+
+static RUNTIME: Mutex<Runtime> = Mutex::new(Runtime::NotStarted);
+
+/// Called every frame by the game. Starts the host on the first one and ticks the mods 20 times a
+/// second. Returns the lines to show in chat. `instance_dir` is only asked for once.
+pub fn on_frame(instance_dir: impl FnOnce() -> PathBuf, in_world: bool) -> Vec<String> {
+    let mut runtime = RUNTIME.lock().unwrap_or_else(|e| e.into_inner());
+    if matches!(*runtime, Runtime::NotStarted) {
+        *runtime = start_from(&instance_dir().join("horizon-fabric"));
+    }
+    match &mut *runtime {
+        Runtime::NotStarted => Vec::new(),
+        Runtime::Off { report } => match report.take_if(|_| in_world) {
+            Some(line) => vec![line],
+            None => Vec::new(),
+        },
+        Runtime::Running { host, last_tick } => {
+            if last_tick.elapsed() < TICK {
+                return Vec::new();
+            }
+            *last_tick = Instant::now();
+            match host.client_tick(in_world) {
+                Ok(out) => out
+                    .into_iter()
+                    .map(|Outgoing::SystemMessage(line)| line)
+                    .collect(),
+                Err(e) => {
+                    eprintln!("horizon-fabric: a mod failed in a tick:\n{e}");
+                    *runtime = Runtime::Off {
+                        report: Some("horizon-fabric: a mod crashed, see the log".to_owned()),
+                    };
+                    Vec::new()
+                }
+            }
+        }
+    }
+}
+
+fn start_from(dir: &Path) -> Runtime {
+    let Ok(java_home) = std::fs::read_to_string(dir.join("java-home.txt")) else {
+        eprintln!("horizon-fabric: not installed in {}", dir.display());
+        return Runtime::Off { report: None };
+    };
+    let config = Config::from_dist(java_home.trim().into(), dir, dir.to_owned());
+    match FabricHost::start(&config) {
+        Ok(host) => Runtime::Running {
+            host,
+            last_tick: Instant::now(),
+        },
+        Err(e) => {
+            eprintln!("horizon-fabric: failed to start:\n{e}");
+            Runtime::Off {
+                report: Some("horizon-fabric: failed to start, see the log".to_owned()),
+            }
+        }
     }
 }
 

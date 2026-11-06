@@ -11,6 +11,8 @@
       check that every public member of the facade exists in the real game, same signature
   ... --version-json <26.3.json>
       fetch the libraries the real game ships, for the mods that use them
+  ... --install <instance folder>
+      copy the runtime to <instance folder>/horizon-fabric/
 """
 import argparse
 import hashlib
@@ -176,8 +178,9 @@ def check_facade(java_home, out, vanilla_jar):
 def run_host(java_home, out, mods, expected):
     target = out / "target"
     env = {**os.environ, "CARGO_TARGET_DIR": str(target)}
-    manifest = HERE / "host" / "Cargo.toml"
-    subprocess.run(["cargo", "build", "--manifest-path", str(manifest), "--bin", "fabric_smoke"], check=True, env=env)
+    host = HERE / "bundle" / "host"
+    subprocess.run(["cargo", "build", "--manifest-path", str(host / "Cargo.toml"), "--bin", "fabric_smoke"], check=True, env=env)
+    (host / "Cargo.lock").unlink(missing_ok=True)  # a native mod's crate isn't allowed to have one
     binary = target / "debug" / ("fabric_smoke.exe" if os.name == "nt" else "fabric_smoke")
     with tempfile.TemporaryDirectory() as game_dir:
         (Path(game_dir) / "mods").mkdir()
@@ -189,6 +192,20 @@ def run_host(java_home, out, mods, expected):
         return subprocess.run(command, cwd=game_dir).returncode
 
 
+def install(java_home, out, instance):
+    """Copies the runtime to <instance>/horizon-fabric/. Leaves its mods/ and config/ alone."""
+    target = instance / "horizon-fabric"
+    (target / "mods").mkdir(parents=True, exist_ok=True)
+    for folder in ("libs", "game-libs"):
+        shutil.rmtree(target / folder, ignore_errors=True)
+        if (out / folder).exists():
+            shutil.copytree(out / folder, target / folder)
+    for jar in ("horizon-fabric-provider.jar", "horizon-fabric-game.jar"):
+        shutil.copy(out / jar, target / jar)
+    (target / "java-home.txt").write_text(str(Path(java_home).resolve()), encoding="utf-8")
+    print(f"installed to {target}")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--java-home", default=os.environ.get("JAVA_HOME"), help="a JDK, 25 or later")
@@ -197,6 +214,7 @@ def main():
     parser.add_argument("--mods", nargs="+", type=Path)
     parser.add_argument("--vanilla-jar", type=Path)
     parser.add_argument("--version-json", type=Path)
+    parser.add_argument("--install", type=Path, metavar="INSTANCE")
     args = parser.parse_args()
     if not args.java_home:
         sys.exit("--java-home or JAVA_HOME: a JDK, 25 or later")
@@ -211,6 +229,8 @@ def main():
         status |= run_host(args.java_home, args.out, [args.out / "testmod" / "horizon-fabric-testmod.jar"], EXPECTED_HELLO)
     if args.mods:
         status |= run_host(args.java_home, args.out, args.mods, None)
+    if args.install:
+        install(args.java_home, args.out, args.install)
     sys.exit(status)
 
 
