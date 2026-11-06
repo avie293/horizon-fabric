@@ -1,6 +1,6 @@
 # horizon-fabric
 
-Hobby project: getting Fabric mods to run in [Horizon](https://github.com/horizon-rust/horizon) (Minecraft 26.3 in Rust).
+Getting Fabric mods to run in [Horizon](https://github.com/horizon-rust/horizon) (Minecraft 26.3 in Rust).
 It hooks into a single instance as an extra install, Horizon itself stays untouched.
 
 No idea if this will ever really work. It's pretty unrealistic and a lot of work, but it's fun.
